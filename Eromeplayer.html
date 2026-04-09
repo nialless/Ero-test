@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erome Multi-Player • UK Local Tool</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
+        :root { --bg: #111; --accent: #e91e63; }
+        body { margin:0; font-family:'Inter',sans-serif; background:#111; color:#ddd; display:flex; flex-direction:column; height:100vh; }
+        header { background:#1f1f1f; padding:12px 20px; display:flex; align-items:center; gap:15px; border-bottom:2px solid var(--accent); }
+        .container { display:flex; flex:1; overflow:hidden; }
+        .sidebar { width:280px; background:#1a1a1a; padding:15px; overflow-y:auto; border-right:1px solid #333; }
+        .main { flex:1; display:flex; flex-direction:column; padding:15px; gap:10px; }
+        .multi-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:15px; }
+        video { background:#000; width:100%; max-height:65vh; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.6); }
+        .clip-item { padding:10px; margin-bottom:6px; background:#222; border-radius:6px; cursor:pointer; transition:all 0.2s; }
+        .clip-item:hover { background:#333; }
+        .clip-item.active { background:var(--accent); color:#fff; }
+        button { background:var(--accent); color:white; border:none; padding:10px 16px; border-radius:6px; font-weight:500; cursor:pointer; }
+        button:hover { filter:brightness(1.1); }
+        input, textarea { width:100%; padding:10px; background:#222; border:1px solid #444; border-radius:6px; color:#ddd; }
+        .controls { display:flex; gap:8px; flex-wrap:wrap; }
+    </style>
+</head>
+<body>
+<header>
+    <h1 style="margin:0;font-size:1.4rem;">Erome Multi-Player</h1>
+    <span style="font-size:0.9rem;opacity:0.7;">Local HTML tool • UK</span>
+</header>
+
+<div class="container">
+    <!-- Sidebar: Clip List -->
+    <div class="sidebar">
+        <h3 style="margin-top:0;">Clip List</h3>
+        <textarea id="urlInput" rows="8" placeholder="Paste one direct MP4 URL per line&#10;(from your Tampermonkey script or 9xbuddy.online)"></textarea>
+        <button onclick="loadClips()" style="width:100%;margin:10px 0;">Load Clips</button>
+        <div id="clipList" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- Main Player Area -->
+    <div class="main">
+        <video id="mainPlayer" controls autoplay></video>
+        
+        <div class="controls">
+            <button onclick="prevClip()">⫷ Prev</button>
+            <button onclick="nextClip()">Next ⫸</button>
+            <button onclick="randomClip()">🎲 Random</button>
+            <button onclick="shufflePlaylist()">🔀 Shuffle</button>
+            <label><input type="checkbox" id="autoplayNext" checked> Auto next</label>
+            <button onclick="openInNewWindow()">📤 Open current in new window</button>
+        </div>
+
+        <!-- Multi-View Grid -->
+        <h3 style="margin:15px 0 8px;">Multi-View (up to 4 simultaneous players)</h3>
+        <div class="multi-grid" id="multiGrid">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+    let clips = [];          // {url: string, name: string}
+    let currentIndex = -1;
+    let multiPlayers = [];
+
+    function extractName(url) {
+        try {
+            const u = new URL(url);
+            let name = u.pathname.split('/').pop() || 'clip';
+            return decodeURIComponent(name).replace(/\.\w+$/, '');
+        } catch(e) {
+            return 'clip';
+        }
+    }
+
+    function loadClips() {
+        const input = document.getElementById('urlInput').value.trim();
+        if (!input) return alert('Paste MP4 URLs first');
+        
+        clips = input.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.startsWith('http') && line.includes('.mp4'))
+            .map(url => ({ url, name: extractName(url) }));
+        
+        if (clips.length === 0) return alert('No valid MP4 URLs found');
+        
+        renderClipList();
+        if (clips.length > 0) playClip(0);
+        
+        // Create multi-view slots
+        const grid = document.getElementById('multiGrid');
+        grid.innerHTML = '';
+        multiPlayers = [];
+        for (let i = 0; i < 4; i++) {
+            const div = document.createElement('div');
+            div.innerHTML = `
+                <select onchange="assignToSlot(${i}, this.value)" style="width:100%;margin-bottom:4px;background:#222;color:#ddd;border:1px solid #444;">
+                    <option value="">— Assign clip to slot ${i+1} —</option>
+                    ${clips.map((c,j) => `<option value="${j}">${c.name}</option>`).join('')}
+                </select>
+                <video id="multi
